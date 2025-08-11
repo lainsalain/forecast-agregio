@@ -16,12 +16,10 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.OffsetDateTime;
 import java.util.Collections;
+import java.util.Optional;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -45,7 +43,7 @@ public class ForecastControllerTest {
         forecast.setValue(1.00);
 
         Slice<Forecast> forecastSlice = new SliceImpl<>(Collections.singletonList(forecast), PageRequest.of(0, 1), false);
-        when(forecastService.getForecasts(any(OffsetDateTime.class), any(OffsetDateTime.class), anyInt(), anyInt())).thenReturn(forecastSlice);
+        given(forecastService.getForecasts(any(OffsetDateTime.class), any(OffsetDateTime.class), anyInt(), anyInt())).willReturn(forecastSlice);
 
         mockMvc.perform(get("/forecasts")
             .param("start_date_time", "2025-08-09T00:00:00Z")
@@ -74,5 +72,28 @@ public class ForecastControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("bad_request"))
                 .andExpect(jsonPath("$.message").value("Limit must be between 1 and 200."));
+    }
+
+    @Test
+    void getAverageAtSpecificTime_ok_returnsAverage() throws Exception {
+        given(forecastService.getAverageAtSpecificTime(anyString(), any(OffsetDateTime.class))).willReturn(Optional.of(50.00));
+        mockMvc.perform(get("/forecasts/average")
+                        .param("perimeter", "Perimeter")
+                        .param("time", "2025-08-09T00:00:00Z")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.perimeter").value("Perimeter"))
+                .andExpect(jsonPath("$.average").value(50.00));
+    }
+
+    @Test
+    void getAverageAtSpecificTime_notFound() throws Exception {
+        given(forecastService.getAverageAtSpecificTime(anyString(), any(OffsetDateTime.class))).willReturn(Optional.empty());
+        mockMvc.perform(get("/forecasts/average")
+                        .param("perimeter", "Perimeter")
+                        .param("time", "2025-08-09T00:00:00Z")
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("not_found"));
     }
 }

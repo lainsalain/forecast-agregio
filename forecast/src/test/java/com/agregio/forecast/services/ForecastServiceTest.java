@@ -11,9 +11,11 @@ import org.springframework.data.domain.SliceImpl;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Collections;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.*;
 
 public class ForecastServiceTest {
@@ -34,7 +36,7 @@ public class ForecastServiceTest {
         Forecast forecast = new Forecast();
         forecast.setTime(start.plusHours(1));
         Slice<Forecast> forecastSlice = new SliceImpl<>(Collections.singletonList(forecast), PageRequest.of(0, 1), false);
-        when(forecastRepository.findByTimeRange(any(OffsetDateTime.class), any(OffsetDateTime.class),  any(PageRequest.class))).thenReturn(forecastSlice);
+        given(forecastRepository.findByTimeRange(any(OffsetDateTime.class), any(OffsetDateTime.class),  any(PageRequest.class))).willReturn(forecastSlice);
 
         Slice<Forecast> result = forecastService.getForecasts(start, end, 1, 0);
         assertEquals(1, result.getContent().size());
@@ -53,5 +55,23 @@ public class ForecastServiceTest {
         assertThrows(IllegalArgumentException.class,
                 () -> forecastService.getForecasts(start, start.plusDays(1), 201, 0));
         verifyNoInteractions(forecastRepository);
+    }
+
+    @Test
+    void getAverageAtSpecificTime_returnsAverage() {
+        OffsetDateTime time = OffsetDateTime.of(2025,8,10,0,0,0,0, ZoneOffset.UTC);
+        given(forecastRepository.averageValueAtSpecificTime(anyString(), any(OffsetDateTime.class))).willReturn(Optional.of(50.00));
+
+        Optional<Double> result = forecastService.getAverageAtSpecificTime("Perimeter", time);
+        assertEquals(Optional.of(50.00), result);
+    }
+
+    @Test
+    void getAverageAtSpecificTime_throwsIllegalArgumentException() {
+        OffsetDateTime time = OffsetDateTime.of(2025,8,10,0,0,0,0, ZoneOffset.UTC);
+        assertThrows(IllegalArgumentException.class,
+                () -> forecastService.getAverageAtSpecificTime(null, time));
+        assertThrows(IllegalArgumentException.class,
+                () -> forecastService.getAverageAtSpecificTime("Perimeter", null));
     }
 }

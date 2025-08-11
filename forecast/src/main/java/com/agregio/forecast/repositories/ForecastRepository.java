@@ -9,12 +9,21 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.repository.query.Param;
 
 import java.time.OffsetDateTime;
+import java.util.Optional;
 
 public interface ForecastRepository extends JpaRepository<Forecast, ForecastId> {
     @Query("""
-            SELECT f FROM Forecast f
+            SELECT f
+            FROM Forecast f
             WHERE f.time >= :start
             AND f.time < :end
             ORDER BY f.time ASC""")
     Slice<Forecast> findByTimeRange(@Param("start") OffsetDateTime start, @Param("end") OffsetDateTime end, Pageable pageable);
+
+    @Query("""
+            SELECT AVG(f.value)
+            FROM Forecast f
+            WHERE f.perimeter = :perimeter
+            AND f.time = :time""")
+    Optional<Double> averageValueAtSpecificTime(@Param("perimeter") String perimeter, @Param("time") OffsetDateTime time);
 }
