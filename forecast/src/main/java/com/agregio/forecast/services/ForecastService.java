@@ -1,5 +1,6 @@
 package com.agregio.forecast.services;
 
+import com.agregio.forecast.dto.ForecastPage;
 import com.agregio.forecast.entities.Forecast;
 import com.agregio.forecast.repositories.ForecastRepository;
 import org.springframework.data.domain.PageRequest;
@@ -9,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -20,25 +22,44 @@ public class ForecastService {
         this.forecastRepository = forecastRepository;
     }
 
+    /**
+     * Get the forecasts between start & end timestamp
+     * @param start
+     * @param end
+     * @param limit
+     * @param nextStartTime
+     * @return
+     */
     @Transactional(readOnly = true)
-    public Slice<Forecast> getForecasts(OffsetDateTime start, OffsetDateTime end, int limit, int offset) {
+    public ForecastPage getForecastPage(OffsetDateTime start, OffsetDateTime end, int limit, OffsetDateTime nextStartTime) {
         if (limit <= 0)
             throw new IllegalArgumentException("Limit must be > 0.");
 
         if (limit > MAX_LIMIT)
             throw new IllegalArgumentException("Limit can not exceed " + MAX_LIMIT + ".");
 
-        if (offset < 0)
-            throw new IllegalArgumentException("Offset must be >= 0.");
+        if (start == null || end == null)
+            throw new IllegalArgumentException("Start and end time must not be null.");
 
         if (end.isBefore(start))
             throw new IllegalArgumentException("Start date must be after end date.");
 
-        int page = offset / limit;
-        Pageable pageable = PageRequest.of(page, limit);
-        return forecastRepository.findByTimeRange(start, end, pageable);
+        Pageable pageable = PageRequest.of(0, limit);
+        List<Forecast> forecasts = nextStartTime == null
+                ? forecastRepository.findFirstPage(start, end, pageable)
+                : forecastRepository.findPageAfterSpecificTime(nextStartTime, end, pageable);
+
+        OffsetDateTime newStartTime = forecasts.isEmpty() ? null : forecasts.get(forecasts.size() - 1).getTime();
+        boolean hasMoreData = newStartTime != null && forecastRepository.existsByTimeGreaterThanAndTimeLessThan(newStartTime, end);
+        return new ForecastPage(forecasts, limit, hasMoreData, newStartTime);
     }
 
+    /**
+     * Get the forecasts average value at a specific timestamp
+     * @param perimeter
+     * @param time
+     * @return
+     */
     @Transactional(readOnly = true)
     public Optional<Double> getAverageAtSpecificTime(String perimeter, OffsetDateTime time) {
         if (perimeter == null) {

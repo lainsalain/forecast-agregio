@@ -15,7 +15,7 @@ import java.util.Map;
 import java.util.Optional;
 
 @RestController
-@RequestMapping("forecasts")
+@RequestMapping("/forecasts")
 public class ForecastController {
     private final ForecastService forecastService;
 
@@ -24,15 +24,23 @@ public class ForecastController {
     }
 
     @GetMapping
-    public ResponseEntity<ForecastPage> getForecasts(
+    public ResponseEntity<?> getForecasts(
             @RequestParam("start_date_time") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime start,
             @RequestParam("end_date_time") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime end,
             @RequestParam(value = "limit", defaultValue = "200") int limit,
-            @RequestParam(value = "offset", defaultValue = "0") int offset
+            @RequestParam(value = "next_start_time", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime nextStart
     ) {
-        Slice<Forecast> forecastSlice = forecastService.getForecasts(start, end, limit, offset);
-        ForecastPage forecastPage = new ForecastPage(forecastSlice.getContent(), limit, offset, forecastSlice.hasNext());
-        return ResponseEntity.ok(forecastPage);
+        ForecastPage page = forecastService.getForecastPage(start, end, limit, nextStart);
+        return ResponseEntity.ok(
+                Map.of(
+                        "forecasts", page.forecasts(),
+                        "limit", page.limit(),
+                        "has_more_data", (page.hasMoreData() ? "Yes" : "No"),
+                        "next_start_time", page.nextStartTime() != null
+                                ? page.nextStartTime().toString()
+                                : "N/A"
+                )
+        );
     }
 
     @GetMapping("/average")
